@@ -21,31 +21,12 @@
     xmlns:Iptc4xmpCore="http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/"
    xmp:CreatorTool="iphoto2xmp.rb by Jens Benecke"
    xmp:MetadataDate="<%= @date_meta %>"
-   xmp:Rating="<%= @rating %>"
    xmp:CreateDate="<%= @date_imported %>"
    photoshop:DateCreated="<%= @date_taken %>"
-   acdsee:rating="<%= @rating %>"
-<% if !!@caption %>
-  acdsee:caption="<%= @caption.gsub(/"/, "'") %>"
-<% end %>
-<% if !!@description %>
-   acdsee:notes="<%= @description.gsub(/"/, "'") %>"
-<% end %>
    digiKam:ImageUniqueID="<%= @uuid %>"
-   digiKam:PickLabel="<%= @hidden %>"
-   digiKam:ColorLabel="<%= @flagged %>"
    exif:DateTimeOriginal="<%= @date_taken %>"
    exif:DateTimeDigitized="<%= @date_imported %>"
    exif:ExifVersion="0221"
-<% if !!@latitude %>
-   exif:GPSLatitudeRef="N"
-   exif:GPSLongitudeRef="E"
-   exif:GPSAltitudeRef="0"
-   exif:GPSVersionID="2.0.0.0"
-   exif:GPSLatitude="<%= @latitude %>"
-   exif:GPSLongitude="<%= @longitude %>"
-   exif:GPSMapDatum="WGS-84"
-<% end %>
 <%# according to MWG guidelines, this is how to store dates. http://www.metadataworkinggroup.org/pdf/mwg_guidance.pdf#page=37 %>
 <% if !!@date_modified and @date_taken != @date_modified %>
    exif:DateTime="<%= @date_modified %>"
@@ -53,30 +34,7 @@
    video:ModificationDate="<%= @date_modified %>"
 <% end %>
    video:DateTimeOriginal="<%= @date_taken %>"
-<% if !!@gpscity %>
-   photoshop:City="<%= @gpscity %>"
-<% end %>
-<% if !!@gpsstate %>
-   photoshop:State="<%= @gpsstate %>"
-<% end %>
-<% if !!@gpscountryname %>
-   photoshop:Country="<%= @gpscountryname %>"
-<% end %>
-<% if !!@gpslocation %>
-   Iptc4xmpCore:Location="<%= @gpslocation %>"
-<% end %>
-<% if !!@gps3lettercountrycode %>
-   Iptc4xmpCore:CountryCode="<%= @gps3lettercountrycode %>"
-<% end %>
   >
-
-<% if @caption %>
-   <dc:title>
-    <rdf:Alt>
-     <rdf:li xml:lang="x-default"><%= @caption %></rdf:li>
-    </rdf:Alt>
-   </dc:title>
-<% end %>
 
 <% unless @keylist.empty? %>
    <digiKam:TagsList>
@@ -116,54 +74,9 @@
    </dc:subject>
 <% end %>
 
-<% if @description %>
-   <tiff:ImageDescription>
-    <rdf:Alt>
-     <rdf:li xml:lang="x-default"><%= @description %></rdf:li>
-    </rdf:Alt>
-   </tiff:ImageDescription>
-   <exif:UserComment>
-    <rdf:Alt>
-     <rdf:li xml:lang="x-default"><%= @description %></rdf:li>
-    </rdf:Alt>
-   </exif:UserComment>
-   <dc:description>
-    <rdf:Alt>
-     <rdf:li xml:lang="x-default"><%= @description %></rdf:li>
-    </rdf:Alt>
-   </dc:description>
-<% end %>
-
-<% if @faces.is_a?(Array) and !@faces.empty? %>
-<!-- <%= @facecomment %> -->
-
-
-   <mwg-rs:Regions rdf:parseType="Resource">
-    <mwg-rs:RegionList>
-     <rdf:Bag>
-<% for face in @faces %>
-       <rdf:li>
-        <rdf:Description
-         mwg-rs:Name="<%= face['name'] %>"
-         mwg-rs:Type="Face">
-         <mwg-rs:Area
-          stArea:x="<%= face['centerx'] %>"
-          stArea:y="<%= face['centery'] %>"
-          stArea:w="<%= face['width'] %>"
-          stArea:h="<%= face['height'] %>"
-          stArea:unit="normalized"/>
-        </rdf:Description>
-       </rdf:li>
-<% end %>
-     </rdf:Bag>
-    </mwg-rs:RegionList>
-   </mwg-rs:Regions>
-
-<% end %>
-
    <dc:creator>
     <rdf:Seq>
-     <rdf:li><%= @creator %></rdf:li>
+     <rdf:li>Jack</rdf:li>
     </rdf:Seq>
    </dc:creator>
   </rdf:Description>

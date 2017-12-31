@@ -398,39 +398,11 @@ masters.each do |photo|
     end
   end
 
-  # Debugging to export a single image (or all images matching a certain regexp)
-  if caption = ENV['CAPTION']
-    next unless photo['caption'] =~ /#{caption.gsub(/,/, '|')}/i       # caption can e.g. be 'IMG_1,IMG_2,...'
-  end
-
   origpath = "Masters/#{photo['imagepath']}"
   # $known doesn't work here, various info in RKVersion is different (eg. caption)
   next if $known["#{basedir}/#{origpath}"]
 
-  # Preview can be mp4, mov, jpg, whatever - but not RAW/RW2, it seems.
-  # Preview has jpg or JPG extension. Try both.
-  # Preview can be in one of two directory structures (depending on iPhoto version). Try both.
-  modpath1 = "Previews/#{photo['imagepath'].gsub(/PNG$|JPG$|RW2$/, 'JPG')}"
-  # if photo['mediatype'] != 'VIDT' and !File.exist?("#{basedir}/#{modpath1}")
-  if !File.exist?("#{basedir}/#{modpath1}")
-    modpath1.gsub!(/jpg$/, 'JPG')
-  end
-  modpath2 = "Previews/#{File.dirname(photo['imagepath'])}/#{photo['uuid']}/#{File.basename(photo['imagepath']).gsub(/PNG$|JPG$|RW2$/, 'jpg')}"
-  # if photo['mediatype'] != 'VIDT' and !File.exist?("#{basedir}/#{modpath2}")
-  if !File.exist?("#{basedir}/#{modpath2}")
-    modpath2 = modpath2.sub(/jpg$/, 'JPG')
-  end
-  modpath = File.exist?("#{basedir}/#{modpath1}") ? modpath1 : modpath2
-
   origxmppath, origdestpath = link_photo(basedir, outdir, photo, origpath, nil)
-  next if done_xmp[origxmppath]    # do not overwrite master XMP twice
-  # link_photo needs origpath to do size comparison for modified images
-  # only perform link_photo for "non-videos" and when a modified image should exist
-  # since iPhoto creates "link mp4" files without real video content for "modified" videos (useless)
-  # if photo['version_number'].to_i > 0 and photo['mediatype'] != 'VIDT'
-  if photo['version_number'].to_i > 0
-    modxmppath, moddestpath = link_photo(basedir, outdir, photo, modpath, origpath)
-  end
 
   # FIXME: Fix size of RW2 files (incorrectly set to 3776x2520, but Digikam sees 3792x2538) (Panasonic LX3)
   # TODO: Get real size of RW2 files (dcraw -i -v $FILE | grep "Image Size" | ...) and use that
@@ -460,16 +432,6 @@ masters.each do |photo|
 
   # Group modified and original images just like in iPhoto.
   # Images have to be identified by (possibly modified) filename and album path since the XMP UUID is not kept
-  if modxmppath
-    origsub = sprintf("SELECT i.id FROM Images i LEFT JOIN Albums a ON i.album=a.id WHERE i.name='%s' AND a.relativePath LIKE '%%/%s'", File.basename(origxmppath, '.*').sqlclean, photo['rollname'].sqlclean)
-    mod_sub = sprintf("SELECT i.id FROM Images i LEFT JOIN Albums a ON i.album=a.id WHERE i.name='%s' AND a.relativePath LIKE '%%/%s'", File.basename(modxmppath, '.*').sqlclean, photo['rollname'].sqlclean)
-    # last parameter: 1 = versioned groups,  2 = normal groups. Here we want 1.
-    group_mod_data << sprintf("((%s), (%s), 1)", mod_sub, origsub)
-    # noinspection RubyScope
-    group_mod_data << sprintf("((%s), (%s), 2)", origsub, mod_sub)
-  end
-
-
   if curr_roll != photo['rollname']
     # write debug output if required
     if p = photo['poster_version_uuid']
@@ -488,33 +450,12 @@ masters.each do |photo|
   debug 2, "  Desc: #{photodescs[photo['id'].to_i]}".green, true  if photodescs[photo['id'].to_i]
   debug 2, "  Orig: #{photo['master_height']}x#{photo['master_width']} (#{'%.4f' % photo['raw_factor_h']}/#{'%.4f' % photo['raw_factor_w']}), #{origpath} (#{File.exist?("#{basedir}/#{origpath}") ? 'found'.green : 'missing'.red})", true
   debug 3, "     => #{origdestpath}".cyan, true
-  # Test for modified images.
-  #debug 2, "  Mod1: #{modpath1}, Dir ", false
-  #debug 2, Dir.exist?(File.dirname("#{basedir}/#{modpath1}")) ? 'OK'.green : 'missing'.red, false
-  #debug 2, File.exist?("#{basedir}/#{modpath1}") ? ', file OK'.green : ', file missing'.red, true
-  #debug 2, "  Mod2: #{modpath2}, Dir ", false
-  #debug 2, Dir.exist?(File.dirname("#{basedir}/#{modpath2}")) ? 'OK'.green : 'missing'.red, false
-  #debug 2, File.exist?("#{basedir}/#{modpath2}") ? ', file OK'.green : ', file missing'.red, true
-  modexists = File.exist?("#{basedir}/#{modpath}")
-  if modxmppath    # modified version *should* exist
-    debug 2, "  Mod : #{photo['processed_height']}x#{photo['processed_width']}, #{modpath} ", false
-    debug 2, modexists ? '(found)'.green : '(missing)'.red, true
-    debug 2, "     => #{moddestpath}".cyan, true  if File.exist?("#{basedir}/#{modpath}")
-  end
 
   exif_rot_orig = ''
   if File.exist?("#{basedir}/#{origpath}") and origpath =~ /jpg$/i \
       and exif_rot_orig = EXIFR::JPEG.new("#{basedir}/#{origpath}").orientation || ''
     exif_rot_orig = convert_exif_rot(exif_rot_orig.to_i)
   end
-  exif_rot_mod = ''
-  if modexists and modpath =~ /jpg$/i \
-      and exif_rot_mod  = EXIFR::JPEG.new("#{basedir}/#{modpath}").orientation || ''
-    exif_rot_mod  = convert_exif_rot(exif_rot_mod.to_i)
-  end
-  #if photo['face_rotation'].to_i != 0 or photo['rotation'] != 0
-    debug 2, "  Flip: EXIF #{exif_rot_orig}°/#{exif_rot_mod}°, photo #{photo['rotation']}°, face(s): #{photo['face_rotation']}°".blue, true
-  #end
 
   #
   # Build up objects with the metadata in using an ERB template. 
@@ -528,30 +469,11 @@ masters.each do |photo|
   @caption = photo['caption']
   #@uuid = photo['version_number'].to_i > 0 ? photo['uuid'] : photo['master_uuid']   # avoid duplicate uuids
   @uuid = photo['master_uuid']    # will be changed further down for version > 1
-  @description = photodescs[photo['id'].to_i]
 
   # Rating is always applied to the edited image (not the master). Apply to both!
-  @rating = photo['rating']       # Value 0 (no rating) and 1..5, like iPhoto
   @hidden = photo['hidden']       # set PickLabel to hidden flag -> would set value '1' which means 'rejected'
   @flagged = photo['flagged']     # set ColorLabel to flagged, would set value '1' which means 'red'
   @date_meta = parse_date(photomoddates[photo['id']], photo['timezone'])
-
-  # save GPS location info in XMP file (RKVersion::overridePlaceId -> Properties::RKPlace
-  #       (user boundaryData?)
-  # TODO: use Library::RKPlaceForVersion to get named Places for photo Versions
-  @longitude = format_gps(photo['longitude'], 'lng')
-  @latitude  = format_gps(photo['latitude'], 'lat')
-  if p = placelist[photo['place_id']]
-    #@gpscity = ''
-    #@gpsstate = ''
-    #@gpscountryname = ''
-    @gpslocation = p['defaultName']
-    #@gps3lettercountrycode = ''
-  else
-    @gpslocation = nil
-  end
-  debug 2, "  GPS : lat:#{@latitude} lng:#{@longitude}, #{@gpslocation}".violet, true
-
 
   # Get keywords. Convert iPhoto specific flags as keywords too.
   @keylist = Array.new
@@ -563,10 +485,10 @@ masters.each do |photo|
                             INNER JOIN RKKeyword ON RKKeywordForVersion.keywordId=RKKeyword.modelId
    WHERE RKVersion.uuid='#{photo['uuid']}'")
   @keylist = photokw.collect {|k| k['name'] }
-  @keylist << 'iPhoto/Hidden' if photo['hidden']==1
-  @keylist << 'iPhoto/Flagged' if photo['flagged']==1
-  @keylist << 'iPhoto/Original' if photo['original']==1
-  @keylist << 'iPhoto/inTrash' if photo['in_trash']==1
+  @keylist << 'photos/Hidden' if photo['hidden']==1
+  @keylist << 'photos/Flagged' if photo['flagged']==1
+  @keylist << 'photos/Original' if photo['original']==1
+  @keylist << 'photos/inTrash' if photo['in_trash']==1
   debug 2, "  Tags: #{photokw.collect {|k| "#{k['name']}(#{k['modelId']})" }.join(', ')}".blue, true unless photokw.empty?
 
 
@@ -590,13 +512,6 @@ masters.each do |photo|
 end
 
 eventmetafile.close
-
-unless face_csv_list.empty?
-  debug 3, "vers_id,caption,exif_rot_orig,exif_rot_mod,rotation,face_rotation,face_angle,face_dir_angle,visible_rot,face_name,face_key,face_tlx,face_tly,face_trx,face_try,face_blx,face_bly,face_brx,face_bry,face_w,face_h,modface_tlx,modface_tly,modface_w,modface_h", true
-  debug 3, face_csv_list.flatten.join("\n")
-end
-
-exit if ENV['CAPTION']
 
 # Write grouping information to SQL file for Digikam.
 # Group data into blocks of 1000 inserts otherwise sqlite will barf.
